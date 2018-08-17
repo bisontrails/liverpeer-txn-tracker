@@ -1,0 +1,26 @@
+{
+  "name": "liverpeer-txn-tracker",
+  "version": "0.0.1",
+  "description": "Tracking livepeer transactions on transcoders.",
+  "main": "index.js",
+  "scripts": {
+    "test": "test.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/BisonTrails/liverpeer-txn-tracker.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/BisonTrails/liverpeer-txn-tracker/issues"
+  },
+  "homepage": "https://github.com/BisonTrails/liverpeer-txn-tracker#readme",
+  "devDependencies": {
+    "@livepeer/sdk": "^1.0.0-alpha.5"
+  },
+  "dependencies": {
+    "csvtojson": "^2.0.8",
+    "web3": "^1.0.0-beta.35"
+  }
+}
