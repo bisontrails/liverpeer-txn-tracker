@@ -8,7 +8,7 @@ const Web3 = require('web3');
 const SolidityCoder = require("./../web3.js/lib/solidity/coder.js");
 
 const compileTxnHistory = require('./combine-txns-history.js');
-const web3 = new Web3(new Web3.providers.HttpProvider('https://eth.bisontrailscomputing.com'));
+const web3 = new Web3(new Web3.providers.HttpProvider('http://localhost:8545'));
 
 const Json2csvParser = require('json2csv').Parser;
 const fs = require("fs");
@@ -18,7 +18,7 @@ const RDS_BLOCK_PRE = 'eth_block.';
 
 
 const LIVEPEER_CONTRACT = '0x511Bc4556D823Ae99630aE8de28b9B80Df90eA2e';
-const VALIDATOR_ADDRESS ='0x50d69f8253685999b4c74a67ccb3d240e2a56ed6'.toLowerCase();
+const VALIDATOR_ADDRESS ='0x5340fdE146C4fEf52558FE0943A23605CE160AF9'.toLowerCase();
 
 const TRANSFER_LOG_FN_CALL_SIG = '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef';
 const REWARD_LOG_FN_CALL_SIG = '0x619caafabdd75649b302ba8419e48cccf64f37f1983ac4727cfb38b57703ffc9'.toLowerCase();
@@ -76,6 +76,7 @@ const main = async () => {
             if (txHash) {
                 const txnReceipt = await getEthTransactionReceipt(txHash);
                 const fromAddress = txnReceipt.from;
+                const toAddress = txnReceipt.to;
                 const blockNumber = txnReceipt.blockNumber;
                 const info = {};
                 for (let j = 0; j < txnReceipt.logs.length; j++) {
@@ -91,7 +92,7 @@ const main = async () => {
                             if (rewardFloat) {
                                 data.totalBonded += rewardFloat;
                             }
-                            await trackEvent(E_REWARD, fromAddress, rewardFloat, blockNumber, transcoderTracker);
+                            await trackEvent(txHash, E_REWARD, fromAddress, toAddress, rewardFloat, blockNumber, transcoderTracker);
                         }
                         // console.log('for address', SolidityCoder.decodeParam('address', topics[1]));
                     } else if (topics[0].toString().toLowerCase() == BOND_FN_CALL_SIG_2) {
@@ -115,7 +116,7 @@ const main = async () => {
                             data.totalBondAmount.push(newTotalBondAmount);
                             data.totalBonded += addedBond;
                             console.log('[bond] ' + fromAddress + ' bonded ' + addedBond + ' LPT to ' + transcoderAddress + ' total: ' + newTotalBondAmount + ' LPT' + ' [' + txHash + ']');
-                            await trackEvent(E_BOND, fromAddress, addedBond, blockNumber, transcoderTracker);
+                            await trackEvent(txHash, E_BOND, fromAddress, toAddress, addedBond, blockNumber, transcoderTracker);
                             addToBondedAccounts(fromAddress, newBondAmount, bondedAccounts, bondedAccountsAmount);
                         } else if (transcoderAddress.toLowerCase() != VALIDATOR_ADDRESS && bondedAccounts.indexOf(fromAddress) > -1) {
                             const blockInfo = await getEthBlock(blockNumber);
@@ -123,7 +124,7 @@ const main = async () => {
                             const amountMoving = bondedAccountsAmount[fromAddress];
                             data.totalBonded -= amountMoving;
                             bondedAccounts.splice(bondedAccounts.indexOf(fromAddress), 1);
-                            await trackEvent(E_MOVE_BOND, fromAddress, -amountMoving, blockNumber, transcoderTracker);
+                            await trackEvent(txHash, E_MOVE_BOND, fromAddress, toAddress, -amountMoving, blockNumber, transcoderTracker);
                         }
                         addToBondedAccountsAmount(fromAddress, newBondAmount, bondedAccountsAmount);
                     } else if (topics[0].toString().toLowerCase() == REBOND_FN_CALL_SIG) {
@@ -136,7 +137,7 @@ const main = async () => {
                             addToBondedAccounts(fromAddress, amount, bondedAccounts, bondedAccountsAmount);
                             if (amount) {
                                 data.totalBonded += amount;
-                                await trackEvent(E_REBOND, fromAddress, amount, blockNumber, transcoderTracker);
+                                await trackEvent(txHash, E_REBOND, fromAddress, toAddress, amount, blockNumber, transcoderTracker);
                             }
                         }
                     } else if (topics[0].toString().toLowerCase() == UNBOND_FN_CALL_SIG) {
@@ -152,7 +153,7 @@ const main = async () => {
                                 if (amount) {
                                     data.totalBonded -= amount;
                                 }
-                                await trackEvent(E_UNBOND, fromAddress, -amount, blockNumber, transcoderTracker);
+                                await trackEvent(txHash, E_UNBOND, fromAddress, toAddress, -amount, blockNumber, transcoderTracker);
                             }
                         }
                     } else if (topics[0].toString().toLowerCase() == BOND_LOG_FN_CALL_SIG) {
@@ -167,7 +168,7 @@ const main = async () => {
                                 addedBond += bondedAccountsAmount[fromAddress];
                             }
                             data.totalBonded += addedBond;
-                            await trackEvent(E_BOND, fromAddress, addedBond, blockNumber, transcoderTracker);
+                            await trackEvent(txHash, E_BOND, fromAddress, toAddress, addedBond, blockNumber, transcoderTracker);
                             addToBondedAccounts(fromAddress, info.transferAmount, bondedAccounts, bondedAccountsAmount);
                             console.log('[bond] ' + fromAddress + ' bonded ' + addedBond + ' LPT to ' + transcoderAddress + ' [' + txHash + ']');
 
@@ -175,7 +176,7 @@ const main = async () => {
                             console.log(fromAddress + ' went somewhere else!!! ' + txHash);
                             const amountMoving = bondedAccountsAmount[fromAddress];
                             data.totalBonded -= amountMoving;
-                            await trackEvent(E_MOVE_BOND, fromAddress, -amountMoving, blockNumber, transcoderTracker);
+                            await trackEvent(txHash, E_MOVE_BOND, fromAddress, toAddress, -amountMoving, blockNumber, transcoderTracker);
                         }
                         addToBondedAccountsAmount(fromAddress, info.transferAmount, bondedAccountsAmount);
                     } else if (topics[0].toString().toLowerCase() == TRANSFER_LOG_FN_CALL_SIG) {
@@ -200,7 +201,7 @@ const main = async () => {
 
     console.log('Transcoder ' + VALIDATOR_ADDRESS + ' has ' + data.totalBonded + ' LPT bonded.');
 
-    const fields = ['type', 'address', 'amount', 'date', 'time'];
+    const fields = ['txHash', 'type', 'fromAddress', 'toAddress', 'amount', 'date', 'time'];
     const opts = { fields };
 
     //write csv file
@@ -261,12 +262,14 @@ const addToBondedAccounts = (address, amount, bondedAccounts) => {
     }
 }
 
-const trackEvent = async (type, address, amount, blockNumber, tracker) => {
+const trackEvent = async (txHash, type, fromAddress, toAddress, amount, blockNumber, tracker) => {
     const blockInfo = await getEthBlock(blockNumber);
     tracker.push({
-        type: type,
-        address: address,
-        amount: amount,
+        txHash,
+        type,
+        fromAddress,
+        toAddress,
+        amount,
         date: new Date(blockInfo.timestamp*1000),
         time: blockInfo.timestamp
     });
@@ -280,5 +283,3 @@ const addToBondedAccountsAmount = (address, amount, bondedAccountsAmount) => {
 }
 
 main();
-
-
